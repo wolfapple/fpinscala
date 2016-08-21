@@ -37,5 +37,31 @@ object Par {
   def sortPar(parList: Par[List[Int]]): Par[List[Int]] =
     map(parList)(_.sorted)
 
-//  def parMap[A,B](ps: List[A])(f: A => B): Par[List[A]]
+  def sequence[A](ps: List[Par[A]]): Par[List[A]] =
+    ps.foldRight[Par[List[A]]](unit(List()))((h,t) => map2(h,t)(_ :: _))
+
+  def parMap[A,B](ps: List[A])(f: A => B): Par[List[B]] = fork {
+    val fbs: List[Par[B]] = ps.map(asyncF(f))
+    sequence(fbs)
+  }
+
+  def parFilter[A](l: List[A])(f: A => Boolean): Par[List[A]] = {
+    val pars: List[Par[List[A]]] =
+      l map (asyncF((a: A) => if (f(a)) List(a) else List()))
+    map(sequence(pars))(_.flatten)
+  }
+
+  def choice[A](cond: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] =
+    es =>
+      if (run(es)(cond).get) t(es)
+      else f(es)
+
+  def choiceN[A](n: Par[Int])(choices: List[Par[A]]): Par[A] =
+    es => {
+      val idx = run(es)(n).get
+      run(es)(choices(idx))
+    }
+
+  def chocieViaChoiceN[A](a: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] =
+    choiceN(map(a)(b => if (b) 0 else 1))(List(t, f))
 }

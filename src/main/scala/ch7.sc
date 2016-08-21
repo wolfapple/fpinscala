@@ -62,6 +62,33 @@ object Par {
       run(es)(choices(idx))
     }
 
-  def chocieViaChoiceN[A](a: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] =
+  def choiceViaChoiceN[A](a: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] =
     choiceN(map(a)(b => if (b) 0 else 1))(List(t, f))
+
+  def choiceMap[K,V](key: Par[K])(choices: Map[K,Par[V]]): Par[V] =
+    es => {
+      val k = run(es)(key).get
+      run(es)(choices(k))
+    }
+
+  def flatMap[A,B](pa: Par[A])(choices: A => Par[B]): Par[B] =
+    es => {
+      val a = run(es)(pa).get
+      run(es)(choices(a))
+    }
+
+  def choiceViaflatMap[A](cond: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] =
+    flatMap(cond)(b => if (b) t else f)
+
+  def choiceNViaflatMap[A](n: Par[Int])(choices: List[Par[A]]): Par[A] =
+    flatMap(n)(i => choices(i))
+
+  def join[A](a: Par[Par[A]]): Par[A] =
+    es => run(es)(run(es)(a).get())
+
+  def joinViaFlatMap[A](a: Par[Par[A]]): Par[A] =
+    flatMap(a)(x => x)
+
+  def flatMapViaJoin[A,B](pa: Par[A])(choices: A => Par[B]): Par[B] =
+    join(map(pa)(choices))
 }
